@@ -1,0 +1,87 @@
+name: GitHub Limits Exploration
+on: [push, workflow_dispatch]
+
+jobs:
+  explore-limits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+        continue-on-error: true
+
+      - name: File System Exploration
+        continue-on-error: true
+        run: |
+          nix-shell -p coreutils git --run '
+            echo "=== File System Limits Test ==="
+            # Test file creation limits
+            for i in {1..100}; do echo "File $i content" > test-file-$i.txt; done
+            ls -la test-file-*.txt | wc -l > file-count.txt
+
+            # Test directory exploration
+            find /home/runner -type d | head -20 > directory-structure.txt
+
+            # Test file manipulation
+            cat /proc/version > system-info.txt
+            whoami > current-user.txt
+            pwd > working-directory.txt
+          '
+
+      - name: GitHub API Exploration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        continue-on-error: true
+        run: |
+          nix-shell -p github-cli jq --run '
+            echo "=== GitHub API Limits Test ==="
+            gh api user > user-info.txt
+            gh api repos/${{ github.repository }} > repo-info.txt
+            gh api repos/${{ github.repository }}/collaborators > collaborators.txt
+            gh repo list garmir --limit 10 > repo-list.txt
+
+            # Test repository management
+            gh api repos/${{ github.repository }}/contents > repo-contents.txt
+          '
+
+      - name: Network and System Exploration
+        continue-on-error: true
+        run: |
+          nix-shell -p curl nettools procps --run '
+            echo "=== Network and System Exploration ==="
+            curl -s ipinfo.io/json > detailed-network.txt
+            ps aux > process-list.txt
+            netstat -tuln > network-connections.txt
+            cat /proc/meminfo > memory-details.txt
+            cat /proc/cpuinfo > cpu-details.txt
+
+            # Test internet access limits
+            curl -s https://httpbin.org/ip > httpbin-ip.txt
+            curl -s https://api.github.com/zen > github-zen.txt
+          '
+
+      - name: Advanced Tool Compilation
+        continue-on-error: true
+        run: |
+          nix-shell -p go rust nodejs python3 gcc --run '
+            echo "=== Advanced Tool Compilation Test ==="
+            # Test Go compilation
+            echo "package main; import \"fmt\"; func main() { fmt.Println(\"Go works\") }" > main.go
+            go run main.go > go-test.txt
+
+            # Test Node.js capabilities
+            node -e "console.log(process.version)" > node-version.txt
+
+            # Test Python capabilities
+            python3 -c "import sys; print(sys.version)" > python-version.txt
+
+            # Test C compilation
+            echo "#include <stdio.h>\nint main() { printf(\"C compilation works\"); return 0; }" > test.c
+            gcc test.c -o test && ./test > c-compilation.txt
+          '
+
+      - name: Upload All Exploration Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: limits-exploration-results
+          path: "*.txt"
+          retention-days: 3
